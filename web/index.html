@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代码转换器 · 编程学习工作台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%234f8cff'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white'%3E%E2%86%94%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lib/codemirror.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <span class="logo">&#128736;</span>
+    <div>
+      <h1>代码转换器</h1>
+      <p class="subtitle">编程学习工作台 · 左边写代码运行，右边一键转换对照学习</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="env-pills" id="envPills"></div>
+    <button class="btn btn-ghost" id="btnSettings" title="配置 AI 转换接口">AI 设置</button>
+  </div>
+</header>
+
+<main class="workspace">
+  <!-- 左栏：编写与运行 -->
+  <section class="panel panel-left" id="panelLeft">
+    <div class="panel-head">
+      <div class="lang-box">
+        <label>编写语言</label>
+        <select id="srcLang"></select>
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost btn-sm" id="btnLoadSample" title="载入该语言的示例代码">载入示例</button>
+        <button class="btn btn-primary btn-sm" id="btnRun" title="运行左侧代码 (Ctrl+Enter)">&#9654; 运行</button>
+      </div>
+    </div>
+    <div class="editor-wrap" id="srcEditor"></div>
+    <div class="stdin-box">
+      <div class="stdin-head">
+        <span>标准输入</span>
+        <span class="hint">程序运行时要读取的输入，每行一个值</span>
+      </div>
+      <textarea id="stdin" rows="2" spellcheck="false" placeholder="例如：&#10;5"></textarea>
+    </div>
+    <div class="output-head">
+      <span>运行输出</span>
+      <span class="run-meta" id="runMeta"></span>
+    </div>
+    <pre class="console" id="runOutput"><span class="console-placeholder">点击「运行」查看输出…</span></pre>
+  </section>
+
+  <!-- 拖拽分隔条 -->
+  <div class="divider" id="divider" title="拖动调整左右宽度"></div>
+
+  <!-- 右栏：转换与对照 -->
+  <section class="panel panel-right" id="panelRight">
+    <div class="panel-head">
+      <div class="lang-box">
+        <label>转换目标</label>
+        <select id="dstLang"></select>
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost btn-sm" id="btnSwap" title="交换左右语言与代码">&#8646; 交换</button>
+        <button class="btn btn-primary btn-sm" id="btnConvert" title="用规则引擎转换（离线）">&#8618; 规则转换</button>
+        <button class="btn btn-ai btn-sm" id="btnConvertAI" title="用 AI 转换（需在设置中配置接口）">AI 转换</button>
+      </div>
+    </div>
+    <div class="editor-wrap" id="dstEditor"></div>
+    <div class="convert-toolbar">
+      <span class="engine-tag" id="engineTag">未转换</span>
+      <div class="actions">
+        <button class="btn btn-ghost btn-sm" id="btnCopy" title="复制转换结果">复制代码</button>
+        <button class="btn btn-ghost btn-sm" id="btnRunResult" title="运行右侧的转换结果">运行结果</button>
+      </div>
+    </div>
+    <div class="output-head">
+      <span>结果输出</span>
+      <span class="run-meta" id="resultMeta"></span>
+    </div>
+    <pre class="console" id="resultOutput"><span class="console-placeholder">转换后可以点击「运行结果」对照两边输出…</span></pre>
+  </section>
+</main>
+
+<footer class="app-footer">
+  <span>规则引擎离线可用，覆盖教材常见语法；复杂代码建议用 AI 转换（设置里填入 API 即可）。</span>
+  <span class="footer-hint">关闭启动窗口即退出程序 · 仅本机访问</span>
+</footer>
+
+<!-- AI 设置弹窗 -->
+<div class="modal-mask hidden" id="settingsMask">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>AI 转换设置</h3>
+      <button class="btn btn-ghost btn-sm" id="btnCloseSettings">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <p class="settings-intro">
+        配置一个「OpenAI 兼容」接口后，「AI 转换」能高质量地把任意代码转换为目标语言。
+        推荐免费/低成本方案：<b>DeepSeek</b>（接口地址 <code>https://api.deepseek.com</code>，模型 <code>deepseek-chat</code>，
+        到 platform.deepseek.com 申请 API Key）；或本地 <b>Ollama</b>（接口地址 <code>http://127.0.0.1:11434/v1</code>，
+        Key 随便填，模型填你拉取的模型名）。
+      </p>
+      <label class="field">
+        <span>接口地址 Base URL</span>
+        <input type="text" id="cfgBaseUrl" placeholder="https://api.deepseek.com">
+      </label>
+      <label class="field">
+        <span>API Key</span>
+        <input type="password" id="cfgApiKey" placeholder="sk-...">
+      </label>
+      <label class="field">
+        <span>模型名称</span>
+        <input type="text" id="cfgModel" placeholder="deepseek-chat">
+      </label>
+      <p class="settings-note">配置仅保存在本机浏览器中，不会上传到任何服务器。API Key 仅用于请求你填写的接口。</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="btnClearConfig">清空配置</button>
+      <button class="btn btn-primary" id="btnSaveConfig">保存配置</button>
+    </div>
+  </div>
+</div>
+
+<script src="lib/codemirror.min.js"></script>
+<script src="lib/clike.min.js"></script>
+<script src="lib/python.min.js"></script>
+<script src="lib/javascript.min.js"></script>
+<script src="lib/active-line.min.js"></script>
+<script src="lib/matchbrackets.min.js"></script>
+<script src="lib/closebrackets.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

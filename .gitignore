@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# 编译产物
+*.exe
+*.o
+*.out
+
+# 调试日志
+_srv_*.txt
+_dbg*.txt
+*.log
