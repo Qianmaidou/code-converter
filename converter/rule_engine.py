@@ -248,6 +248,32 @@ def map_ops_js_to_py(expr):
     return s.strip()
 
 
+def js_concat_to_py_fstring(expr):
+    """JS 表达式中的 '字符串' + 变量 拼接 -> Python f-string。
+    纯变量加法（a + b）保持不变；只要有一个操作数是字符串字面量就整体转 f-string。"""
+    tokens = [t.strip() for t in split_top(expr, "+") if t.strip()]
+    if len(tokens) < 2:
+        return map_ops_js_to_py(expr)
+    has_str = False
+    for t in tokens:
+        if (t.startswith('"') and t.endswith('"') and len(t) >= 2) or \
+           (t.startswith("'") and t.endswith("'") and len(t) >= 2):
+            has_str = True
+            break
+    if not has_str:
+        return map_ops_js_to_py(expr)
+    pieces = []
+    for t in tokens:
+        t = t.strip()
+        if t.startswith('"') and t.endswith('"') and len(t) >= 2:
+            pieces.append(t[1:-1].replace("{", "{{").replace("}", "}}"))
+        elif t.startswith("'") and t.endswith("'") and len(t) >= 2:
+            pieces.append(t[1:-1].replace("{", "{{").replace("}", "}}"))
+        else:
+            pieces.append("{" + map_ops_js_to_py(t) + "}")
+    return 'f"' + "".join(pieces) + '"'
+
+
 # ---------------------------------------------------------------------------
 # 格式化字符串解析
 # ---------------------------------------------------------------------------
@@ -1310,6 +1336,31 @@ def py_to_clike(code, is_cpp=False):
     guard_base = None  # 正在收集 __main__ 守卫体（记录守卫行的缩进深度）
     guard_collect = []
     saw_guard = False
+    sum_counter = 0
+
+    def expand_sum_range(expr, tmp_var):
+        """sum(range(a,b[,step])) -> C 循环累加行列表；非该模式返回 None"""
+        m = re.match(r"^\s*sum\(\s*range\(\s*([^()]*?)\s*\)\s*\)\s*$", expr)
+        if not m:
+            return None
+        parts = [p.strip() for p in split_top(m.group(1), ",") if p.strip()]
+        if len(parts) == 1:
+            start, end, step = "0", parts[0], "1"
+        elif len(parts) == 2:
+            start, end, step = parts[0], parts[1], "1"
+        elif len(parts) == 3:
+            start, end, step = parts[0], parts[1], parts[2]
+        else:
+            return None
+        ivar = "__i"
+        rows = [f"int {tmp_var} = 0;"]
+        if step.startswith("-"):
+            rows.append(f"for (int {ivar} = {map_ops_py_to_c(start)}; {ivar} > {map_ops_py_to_c(end)}; {ivar} += {map_ops_py_to_c(step)}) {{")
+        else:
+            rows.append(f"for (int {ivar} = {map_ops_py_to_c(start)}; {ivar} < {map_ops_py_to_c(end)}; {ivar} += {map_ops_py_to_c(step)}) {{")
+        rows.append(f"    {tmp_var} += {ivar};")
+        rows.append("}")
+        return rows
 
     def emit(line):
         target = func_lines if stream == "func" else main_lines
@@ -1527,6 +1578,12 @@ def py_to_clike(code, is_cpp=False):
         m_assign = re.match(r"^([A-Za-z_]\w*)\s*=\s*(.+)$", s)
         if m_assign:
             var, rhs = m_assign.group(1), m_assign.group(2).strip()
+            sr = expand_sum_range(rhs, var)
+            if sr:
+                for l in sr:
+                    emit(l)
+                sym.declare(var, "int")
+                continue
             m_list = re.match(r"^\[\s*0\s*\]\s*\*\s*(.+)$", rhs)
             if m_list:
                 n = map_ops_py_to_c(m_list.group(1))
@@ -1573,7 +1630,20 @@ def py_to_clike(code, is_cpp=False):
             args = split_top(m_print.group(1))
             if args and args[-1].startswith("end="):
                 args = args[:-1]
-            for st in py_print_to_c(args, sym):
+            new_args = []
+            for a in args:
+                a = a.strip()
+                if not (a.startswith('"') or a.startswith("'")):
+                    mm = re.search(r"sum\(\s*range\([^()]*\)\s*\)", a)
+                    if mm:
+                        tmp = f"_sum{sum_counter}"
+                        sum_counter += 1
+                        for l in expand_sum_range(mm.group(0), tmp):
+                            emit(l)
+                        sym.declare(tmp, "int")
+                        a = a.replace(mm.group(0), tmp)
+                new_args.append(a)
+            for st in py_print_to_c(new_args, sym):
                 emit(st)
             continue
 
@@ -1983,7 +2053,7 @@ def js_to_python(code):
                 lit = re.sub(r"\$\{\s*([^}]+?)\s*\}", r"{\1}", lit)
                 emit(f'print(f"{lit}")')
                 continue
-            args = [map_ops_js_to_py(a) for a in split_top(inner) if a.strip()]
+            args = [js_concat_to_py_fstring(a) for a in split_top(inner) if a.strip()]
             emit(f"print({', '.join(args)})")
             continue
 
@@ -2019,7 +2089,7 @@ def js_to_python(code):
                 emit(f"{var} = input()")
                 sym.declare(var, "str")
                 continue
-            emit(f"{var} = {map_ops_js_to_py(rhs)}")
+            emit(f"{var} = {js_concat_to_py_fstring(rhs)}")
             sym.declare(var, guess_type(rhs) or "int")
             continue
         m_assign2 = re.match(r"^([A-Za-z_]\w*)\s*=\s*(.+?);?$", s)
@@ -2032,7 +2102,7 @@ def js_to_python(code):
             elif rhs == "_in()":
                 emit(f"{var} = input()")
             else:
-                emit(f"{var} = {map_ops_js_to_py(rhs)}")
+                emit(f"{var} = {js_concat_to_py_fstring(rhs)}")
             continue
 
         s2 = map_ops_js_to_py(s.rstrip(";"))

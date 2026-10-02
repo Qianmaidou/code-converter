@@ -92,6 +92,30 @@
     return LANGS[0];
   }
 
+  // ---------- 输入需求检测（防止 scanf/input 读到空输入跑出垃圾结果） ----------
+  function needsInput(code, lang) {
+    if (!code) return false;
+    if (lang === "c" || lang === "cpp") {
+      return /scanf\s*\(|cin\s*>>|getchar\s*\(|gets\s*\(/.test(code);
+    }
+    if (lang === "python") {
+      return /\binput\s*\(/.test(code);
+    }
+    if (lang === "javascript") {
+      return /_inInt\s*\(|_inFloat\s*\(|_in\s*\(|readline|readSync|process\.stdin/.test(code);
+    }
+    return false;
+  }
+
+  function ensureStdin(code, lang, outEl) {
+    if (needsInput(code, lang) && !$("stdin").value.trim()) {
+      flashOutput(outEl, "程序需要键盘输入：请先在「标准输入」框中填写（每行一个值，示例可填 5）");
+      $("stdin").focus();
+      return false;
+    }
+    return true;
+  }
+
   // ---------- CodeMirror ----------
   function makeEditor(host, value, mode) {
     var cm = CodeMirror(host, {
@@ -154,6 +178,7 @@
   function runCode() {
     var code = srcEditor.getValue();
     if (!code.trim()) { flashOutput($("runOutput"), "请先在左侧编写代码"); return; }
+    if (!ensureStdin(code, srcLang, $("runOutput"))) return;
     var btn = $("btnRun");
     setBusy(btn, true, "运行中…");
     $("runMeta").textContent = "";
@@ -179,6 +204,7 @@
   function runResult() {
     var code = dstEditor.getValue();
     if (!code.trim()) { flashOutput($("resultOutput"), "右侧还没有代码，请先转换"); return; }
+    if (!ensureStdin(code, dstLang, $("resultOutput"))) return;
     var btn = $("btnRunResult");
     setBusy(btn, true, "运行中…");
     $("resultMeta").textContent = "";

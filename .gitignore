@@ -11,3 +11,7 @@ __pycache__/
 _srv_*.txt
 _dbg*.txt
 *.log
+_sumvar_out.txt
+
+# 交付压缩包
+*.zip

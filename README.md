@@ -9,6 +9,7 @@
 - **离线规则引擎转换**：覆盖教材常见语法（`printf/scanf` ↔ `print/input`、`cin/cout` ↔ `input/print`、C/JS 的 `for` ↔ Python `range`、函数、数组、`if/while/do-while` 等），零依赖零成本
 - **可选 AI 转换**：配置任意 OpenAI 兼容接口（DeepSeek / 本地 Ollama 等）即可高质量转换复杂代码
 - **打开即用**：双击 `启动代码转换器.bat`，自动启动本地服务并打开浏览器；关闭窗口即退出
+- **输入防呆**：检测到程序需要键盘输入（`scanf/cin/input()` 等）而「标准输入」框为空时，会提示先填写，避免空输入跑出未定义结果
 - **本地安全**：服务仅监听 `127.0.0.1`，不联网、不上传任何数据；AI 配置仅保存在本机浏览器 localStorage
 
 ## 快速开始
