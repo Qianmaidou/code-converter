@@ -315,6 +315,13 @@ def find_free_port(start):
 
 def main():
     import argparse
+
+    # pythonw.exe（无控制台）环境下 stdio 为 None，重定向到空设备避免崩溃
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
     parser = argparse.ArgumentParser(description="代码转换器 本地服务")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="起始端口")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
@@ -323,7 +330,8 @@ def main():
     port, srv = find_free_port(args.port)
     if srv is None:
         print("错误：找不到可用端口。请关闭占用端口的程序后重试。")
-        input("按回车退出…")
+        if sys.stdin is not None:
+            input("按回车退出…")
         return
 
     url = f"http://127.0.0.1:{port}"

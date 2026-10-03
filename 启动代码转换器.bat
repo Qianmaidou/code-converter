@@ -1,21 +1,59 @@
 @echo off
-chcp 65001 >nul
-title ä»£ç è½¬æ¢å™¨
+title ´úÂë×ª»»Æ÷
 cd /d "%~dp0"
+
+set "URL=http://127.0.0.1:8765/"
 
 where python >nul 2>nul
 if errorlevel 1 (
   echo.
-  echo   [é”™è¯¯] æ²¡æœ‰æ‰¾åˆ° Pythonã€‚
-  echo   è¯·å…ˆå®‰è£… Python 3.8 æˆ–æ›´é«˜ç‰ˆæœ¬ï¼ˆå®‰è£…æ—¶å‹¾é€‰ Add python.exe to PATHï¼‰ï¼Œ
-  echo   å®‰è£…å®ŒæˆåŽé‡æ–°åŒå‡»æœ¬æ–‡ä»¶å³å¯ã€‚
+  echo   [´íÎó] Ã»ÓÐÕÒµ½ Python¡£
+  echo   ÇëÏÈ°²×° Python 3.8 »ò¸ü¸ß°æ±¾£¨°²×°Ê±¹´Ñ¡ Add python.exe to PATH£©£¬
+  echo   °²×°Íê³ÉºóÖØÐÂË«»÷±¾ÎÄ¼þ¼´¿É¡£
   echo.
-  pause
+  timeout /t 3 /nobreak >nul
   exit /b 1
 )
 
-echo æ­£åœ¨å¯åŠ¨ä»£ç è½¬æ¢å™¨ï¼Œæµè§ˆå™¨å°†è‡ªåŠ¨æ‰“å¼€â€¦
-echo ä½¿ç”¨å®Œæ¯•åŽï¼Œå…³é—­æœ¬çª—å£å³å¯é€€å‡ºç¨‹åºã€‚
+echo ÕýÔÚÆô¶¯´úÂë×ª»»Æ÷£¬ä¯ÀÀÆ÷½«×Ô¶¯´ò¿ª¡­
+
+REM ---------- Èô·þÎñÒÑÔÚÔËÐÐ£¬Ö±½Ó´ò¿ªä¯ÀÀÆ÷ ----------
+set "CODE="
+for /f %%i in ('curl.exe -s -o NUL -w "%%{http_code}" --max-time 2 %URL%api/langs 2^>nul') do set "CODE=%%i"
+if "%CODE%"=="200" (
+  echo ·þÎñÒÑÔÚºóÌ¨ÔËÐÐ£¬Ö±½Ó´ò¿ªä¯ÀÀÆ÷¡­
+  start "" "%URL%"
+  exit /b 0
+)
+
+REM ---------- ºóÌ¨Æô¶¯·þÎñ£¨Òþ²Ø´°¿Ú£¬ÎÞÐè±£ÁôÈÎºÎ´°¿Ú£© ----------
+where pythonw >nul 2>nul
+if errorlevel 1 (
+  powershell -NoProfile -Command "Start-Process -FilePath 'python.exe' -ArgumentList 'server.py','--port','8765','--no-browser' -WorkingDirectory '%~dp0' -WindowStyle Hidden"
+) else (
+  powershell -NoProfile -Command "Start-Process -FilePath 'pythonw.exe' -ArgumentList 'server.py','--port','8765','--no-browser' -WorkingDirectory '%~dp0'"
+)
+
+REM ---------- µÈ´ý·þÎñ¾ÍÐ÷£¨×î¶àÔ¼ 12 Ãë£© ----------
+set /a TRY=0
+:WAIT
+timeout /t 1 /nobreak >nul
+set /a TRY+=1
+set "CODE="
+for /f %%i in ('curl.exe -s -o NUL -w "%%{http_code}" --max-time 2 %URL%api/langs 2^>nul') do set "CODE=%%i"
+if "%CODE%"=="200" goto OPEN
+if %TRY% lss 12 goto WAIT
+
 echo.
-python server.py
-pause
+echo   [ÌáÊ¾] ·þÎñÆô¶¯½ÏÂý»òÊ§°Ü£¬ÇëÉÔºóÊÖ¶¯ÔÚä¯ÀÀÆ÷´ò¿ª %URL%
+timeout /t 3 /nobreak >nul
+exit /b 1
+
+:OPEN
+start "" "%URL%"
+echo.
+echo   ? Æô¶¯Íê³É£º·þÎñÔÚºóÌ¨ÔËÐÐ£¬±¾´°¿Ú¿ÉÒÔËæÊ±¹Ø±Õ£¬²»Ó°ÏìÊ¹ÓÃ¡£
+echo   ÐèÒªÍ£Ö¹·þÎñÊ±£¬Ë«»÷¡¸Í£Ö¹´úÂë×ª»»Æ÷.bat¡¹¼´¿É¡£
+echo.
+timeout /t 1 /nobreak >nul
+exit /b 0
